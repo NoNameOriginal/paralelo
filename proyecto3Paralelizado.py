@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 import string, os, time, sys, collections
 import numpy as np
-#import pycuda.driver as cuda
-#from pycuda.autoinit import *
-#from pycuda.compiler import SourceModule
 from numpy import linalg as LA
 from math import *
 from mpi4py import *
@@ -44,52 +41,61 @@ def organizar(file):
       return words
 
 lista = []
+termino = False
+terminoTodo = False
 def leerArchivo():
       comm = MPI.COMM_WORLD
       size = comm.Get_size()
       rank = comm.Get_rank()
-
+      
       if rank == 0:
             data = os.listdir(str(sys.argv[1]))
+            chunks = [[] for _ in range(size)]
+            for i, chunk in enumerate(data):
+                  chunks[i % size].append(chunk)
       else:
             data = None
-      data = comm.bcast(data, root=0)
-      for i in data:
-            if i not in lista:
-                  data = organizar(i)
-                  lista.append(i)
+            chunks = None
+      data = comm.scatter(chunks, root=0)
+      for i in range(0,len(data)):
+            print(data[i])
+            data[i] = organizar(data[i])      
       newData = comm.gather(data,root=0)
       if rank==0:
             return newData
 def main():
-      arr = leerArchivo()
-      print arr
-      for i in range(len(arr)):
-        for j in range(len(arr[i])):
-          if arr[i][j] not in STOPWORDS:
-            otroWords.append(arr[i][j])
-      mapa = collections.Counter(palabras)
-      tMayu = dict(mapa.most_common(40)).keys()
-      print tMayu
-      fdt = []
-      for doc in arr:
-            result = []
-            for i in range(len(tMayu)):
-                  result.append(0)
-            for word in doc:
-                  if word not in STOPWORDS:
-                        if word in tMayu:
-                              result[tMayu.index(word)] += 1
-            fdt.append(result)
-      mat = np.empty((len(fdt),len(fdt)))
-      for i in range(len(fdt)):
-            for j in range(len(fdt)):
-                  mat[i][j] = 1-jaccard_similarity(fdt[i],fdt[j])
-      print(mat)
-      cents, C = kMeans(mat, 3)
-      print(C)
-      print(cents)
-      print(time.time() - timeIni)
+      palabras = []
+      arrTemp = leerArchivo()
+      if arrTemp:
+            print(len(arrTemp))
+            for item in arrTemp:
+                  for fil in item:
+                        arr.append(fil)
+            print(len(arr))
+            for i in range(len(arr)):
+                  for j in range(len(arr[i])):
+                        if arr[i][j] not in STOPWORDS:
+                              palabras.append(arr[i][j])
+            mapa = collections.Counter(palabras)
+            tMayu = dict(mapa.most_common(40)).keys()
+            fdt = []
+            for doc in arr:
+                  result = []
+                  for i in range(len(tMayu)):
+                        result.append(0)
+                  for word in doc:
+                        if word not in STOPWORDS:
+                              if word in tMayu:
+                                    result[tMayu.index(word)] += 1
+                  fdt.append(result)
+            mat = np.empty((len(fdt),len(fdt)))
+            for i in range(len(fdt)):
+                  for j in range(len(fdt)):
+                        mat[i][j] = 1-jaccard_similarity(fdt[i],fdt[j])
+            print(mat)
+            cents, C = kMeans(mat, 3)
+            print(C)
+            print(cents)
 timeIni = time.time()
 main()
-print(str(timeIni - time.time()))
+print(time.time() - timeIni)
